@@ -1,0 +1,359 @@
+<html>
+<head>
+<title>Cricket Live Scoreboard</title>
+<style>
+body { font-family: Arial; padding: 20px; background: #f2f2f2; }
+.page { display: none; }
+.active { display: block; }
+input, select { padding: 8px; margin: 5px 0; width: 250px; }
+button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+.score-btn { font-size: 16px; }
+.section { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+.player-box { display: flex; flex-wrap: wrap; gap: 10px; }
+.player-box input { width: 200px; }
+.batsman-stats { margin-top: 10px; }
+table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+table, th, td { border: 1px solid #ccc; }
+th, td { padding: 6px; text-align: center; }
+.over-summary { margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<h1>🏏 Cricket Live Scoreboard</h1>
+
+<!-- PAGE 1: TEAM NAMES -->
+<div id="page1" class="page active section">
+    <h2>Step 1: Enter Team Names</h2>
+    <input id="teamA" placeholder="Team A Name"><br>
+    <input id="teamB" placeholder="Team B Name"><br>
+    <button onclick="saveTeams()">Next →</button>
+</div>
+
+<!-- PAGE 2: PLAYER ENTRY -->
+<div id="page2" class="page section">
+    <h2>Step 2: Enter Players (Max 11)</h2>
+    <h3 id="teamALabel"></h3>
+    <div id="playersABox" class="player-box"></div>
+    <h3 id="teamBLabel"></h3>
+    <div id="playersBBox" class="player-box"></div>
+    <button onclick="savePlayers()">Next →</button>
+</div>
+
+<!-- PAGE 3: MATCH SETUP -->
+<div id="page3" class="page section">
+    <h2>Step 3: Match Setup</h2>
+
+    <label>Select Batting Team:</label><br>
+    <select id="battingTeam"></select><br>
+
+    <label>Select Bowling Team:</label><br>
+    <select id="bowlingTeam"></select><br>
+
+    <label>Select Striker:</label><br>
+    <select id="striker"></select><br>
+
+    <label>Select Non-Striker:</label><br>
+    <select id="nonstriker"></select><br>
+
+    <label>Select Bowler:</label><br>
+    <select id="bowler"></select><br>
+
+    <label>Total Overs:</label><br>
+    <input type="number" id="totalOvers" min="1" max="50" value="5"><br>
+
+    <button onclick="startMatch()">Start Match →</button>
+</div>
+
+<!-- PAGE 4: LIVE SCORE -->
+<div id="page4" class="page section">
+    <h2>🏏 Live Scoreboard</h2>
+    <h3 id="displayTeams"></h3>
+    <h2 id="score">0 / 0</h2>
+    <h3 id="overs">Overs: 0.0 / <span id="totalOversDisplay">5</span></h3>
+
+    <div class="batsman-stats">
+        <h3>Striker: <span id="dispStriker"></span> (Runs: <span id="strikerRuns">0</span>)</h3>
+        <h3>Non-Striker: <span id="dispNonStriker"></span> (Runs: <span id="nonStrikerRuns">0</span>)</h3>
+    </div>
+
+    <div>
+        <label>Select Bowler:</label><br>
+        <select id="bowlerSelect"></select>
+        <button onclick="changeBowler()">Change Bowler</button>
+    </div>
+    <h3>Current Bowler: <span id="dispBowler"></span></h3>
+
+    <div>
+        <button class="score-btn" onclick="addRuns(0)">• DOT</button>
+        <button class="score-btn" onclick="addRuns(1)">1</button>
+        <button class="score-btn" onclick="addRuns(2)">2</button>
+        <button class="score-btn" onclick="addRuns(3)">3</button>
+        <button class="score-btn" onclick="addRuns(4)">4</button>
+        <button class="score-btn" onclick="addRuns(6)">6</button>
+        <br><br>
+        <button class="score-btn" onclick="wideBall()">Wide</button>
+        <button class="score-btn" onclick="noBall()">No Ball</button>
+        <button class="score-btn" onclick="wicket()">Wicket</button>
+        <button class="score-btn" onclick="undo()">Undo</button>
+    </div>
+
+    <h3>Ball-by-Ball History</h3>
+    <table id="ballHistoryTable">
+        <thead>
+            <tr>
+                <th>Over.Ball</th>
+                <th>Batsman</th>
+                <th>Non-Striker</th>
+                <th>Bowler</th>
+                <th>Run/Extra/Wicket</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h3>Over Summary</h3>
+    <table id="overSummaryTable">
+        <thead>
+            <tr>
+                <th>Over</th>
+                <th>Striker Runs</th>
+                <th>Non-Striker Runs</th>
+                <th>Runs in Over</th>
+                <th>Wickets in Over</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+let teams = {};
+let players = {};
+let runs=0, wickets=0, balls=0;
+let strikerName="", nonStrikerName="", bowlerName="";
+let strikerRuns=0, nonStrikerRuns=0;
+let totalOvers=5;
+let ballHistory=[];
+let currentOverRuns=0;
+let currentOverWickets=0;
+let matchOver=false;
+
+/* Show page */
+function showPage(id){ document.querySelectorAll(".page").forEach(p=>p.classList.remove("active")); document.getElementById(id).classList.add("active"); }
+
+/* Team input */
+function saveTeams(){
+    teams.A = document.getElementById("teamA").value.trim();
+    teams.B = document.getElementById("teamB").value.trim();
+    if(!teams.A || !teams.B) return alert("Enter both team names");
+    document.getElementById("teamALabel").innerText = "Players of "+teams.A;
+    document.getElementById("teamBLabel").innerText = "Players of "+teams.B;
+    createPlayerBoxes("playersABox",11);
+    createPlayerBoxes("playersBBox",11);
+    showPage("page2");
+}
+
+function createPlayerBoxes(containerId,count){
+    const container=document.getElementById(containerId); container.innerHTML="";
+    for(let i=1;i<=count;i++){
+        const input=document.createElement("input"); input.placeholder="Player "+i; input.id=containerId+"_player"+i;
+        container.appendChild(input);
+    }
+}
+
+/* Player input */
+function savePlayers(){
+    players[teams.A]=[]; players[teams.B]=[];
+    for(let i=1;i<=11;i++){
+        let pA=document.getElementById("playersABox_player"+i).value.trim();
+        let pB=document.getElementById("playersBBox_player"+i).value.trim();
+        if(pA) players[teams.A].push(pA); if(pB) players[teams.B].push(pB);
+    }
+    if(players[teams.A].length==0 || players[teams.B].length==0) return alert("Enter players for both teams");
+
+    const batSel=document.getElementById("battingTeam"); 
+    const bowlSel=document.getElementById("bowlingTeam");
+    batSel.innerHTML=`<option value="">--Select Batting Team--</option><option>${teams.A}</option><option>${teams.B}</option>`;
+    bowlSel.innerHTML=`<option value="">--Select Bowling Team--</option><option>${teams.A}</option><option>${teams.B}</option>`;
+    
+    batSel.addEventListener("change", updateTeamOptions);
+    bowlSel.addEventListener("change", updateTeamOptions);
+
+    populateBatsmen(); populateBowler();
+    showPage("page3");
+}
+
+/* Prevent same team selection for batting and bowling */
+function updateTeamOptions() {
+    const batSel = document.getElementById("battingTeam");
+    const bowlSel = document.getElementById("bowlingTeam");
+
+    const selectedBat = batSel.value;
+    const selectedBowl = bowlSel.value;
+
+    // Populate batting team
+    batSel.innerHTML = '<option value="">--Select Batting Team--</option>';
+    [teams.A, teams.B].forEach(t => {
+        if (t !== selectedBowl) {
+            batSel.innerHTML += `<option value="${t}" ${t===selectedBat?'selected':''}>${t}</option>`;
+        }
+    });
+
+    // Populate bowling team
+    bowlSel.innerHTML = '<option value="">--Select Bowling Team--</option>';
+    [teams.A, teams.B].forEach(t => {
+        if (t !== selectedBat) {
+            bowlSel.innerHTML += `<option value="${t}" ${t===selectedBowl?'selected':''}>${t}</option>`;
+        }
+    });
+
+    populateBatsmen();
+    populateBowler();
+}
+
+function populateBatsmen(){
+    const batTeam=document.getElementById("battingTeam").value;
+    const strikerSel=document.getElementById("striker"); const nonSel=document.getElementById("nonstriker");
+    strikerSel.innerHTML=""; nonSel.innerHTML="";
+    if(!batTeam) return;
+    players[batTeam].forEach(p=>{ strikerSel.innerHTML+=`<option>${p}</option>`; nonSel.innerHTML+=`<option>${p}</option>`; });
+}
+
+function populateBowler(){
+    const bowlTeam=document.getElementById("bowlingTeam").value;
+    const bowlerSel=document.getElementById("bowler"); const bowlerSelect=document.getElementById("bowlerSelect");
+    bowlerSel.innerHTML=""; bowlerSelect.innerHTML="";
+    if(!bowlTeam) return;
+    players[bowlTeam].forEach(p=>{ bowlerSel.innerHTML+=`<option>${p}</option>`; bowlerSelect.innerHTML+=`<option>${p}</option>`; });
+}
+
+/* Start match */
+function startMatch(){
+    strikerName=document.getElementById("striker").value; 
+    nonStrikerName=document.getElementById("nonstriker").value;
+    bowlerName=document.getElementById("bowler").value; 
+    totalOvers=parseInt(document.getElementById("totalOvers").value);
+    if(!strikerName || !nonStrikerName || !bowlerName) return alert("Select batsmen and bowler");
+    runs=0; wickets=0; balls=0; strikerRuns=0; nonStrikerRuns=0; ballHistory=[]; currentOverRuns=0; currentOverWickets=0;
+    matchOver=false;
+    document.getElementById("totalOversDisplay").innerText=totalOvers;
+    updateBoard(); showPage("page4");
+}
+
+/* Update scoreboard */
+function updateBoard(){
+    document.getElementById("score").innerText=`${runs} / ${wickets}`;
+    document.getElementById("overs").innerText="Overs: "+Math.floor(balls/6)+"."+(balls%6)+` / ${totalOvers}`;
+    document.getElementById("dispStriker").innerText=strikerName;
+    document.getElementById("dispNonStriker").innerText=nonStrikerName;
+    document.getElementById("strikerRuns").innerText=strikerRuns;
+    document.getElementById("nonStrikerRuns").innerText=nonStrikerRuns;
+    document.getElementById("dispBowler").innerText=bowlerName;
+}
+
+/* Ball scoring */
+function addRuns(r){
+    if(matchOver) return alert("Match Over!");
+    runs+=r; balls++; strikerRuns+=r;
+    currentOverRuns+=r;
+    ballHistory.push({over:Math.floor(balls/6)+1, ball:(balls%6===0?6:balls%6), striker:strikerName, nonStriker:nonStrikerName, bowler:bowlerName, value:r});
+    if(r===1 || r===3) swapStrike();
+    checkOver(); updateHistory(); updateBoard();
+}
+
+function wideBall(){
+    if(matchOver) return alert("Match Over!");
+    runs+=1; currentOverRuns+=1;
+    ballHistory.push({over:Math.floor(balls/6)+1, ball:(balls%6===0?6:balls%6), striker:strikerName, nonStriker:nonStrikerName, bowler:bowlerName, value:"Wd"});
+    // Do NOT swap strike
+    updateHistory(); updateBoard();
+}
+
+function noBall(){
+    if(matchOver) return alert("Match Over!");
+    ballHistory.push({over:Math.floor(balls/6)+1, ball:(balls%6===0?6:balls%6), striker:strikerName, nonStriker:nonStrikerName, bowler:bowlerName, value:"Nb"});
+    updateHistory(); updateBoard();
+}
+
+function wicket(){
+    if(matchOver) return alert("Match Over!");
+    wickets++; balls++; currentOverWickets++;
+    ballHistory.push({over:Math.floor(balls/6)+1, ball:(balls%6===0?6:balls%6), striker:strikerName, nonStriker:nonStrikerName, bowler:bowlerName, value:"W"});
+
+    const batTeam=document.getElementById("battingTeam").value;
+    let remaining=players[batTeam].filter(p=>p!==strikerName && p!==nonStrikerName);
+
+    if(remaining.length===0){
+        matchOver=true;
+        alert("All Out! Innings Finished. Match Over.");
+        updateBoard(); updateHistory(); return;
+    }
+
+    // Ask user to select new striker
+    let nextStriker = prompt("Enter the next striker from remaining players:\n"+remaining.join(", "));
+    if(!remaining.includes(nextStriker)) nextStriker = remaining[0];
+    strikerName=nextStriker;
+
+    checkOver(); updateHistory(); updateBoard();
+}
+
+/* Swap strike with runs */
+function swapStrike(){ [strikerName, nonStrikerName]=[nonStrikerName, strikerName]; [strikerRuns, nonStrikerRuns]=[nonStrikerRuns, strikerRuns]; }
+
+/* Over check */
+function checkOver(){
+    if(balls%6===0){
+        addOverSummary();
+        if(Math.floor(balls/6) >= totalOvers){
+            matchOver=true;
+            alert("Overs Finished! Innings Over. Match Over.");
+        } else {
+            alert("Over finished! Please select new bowler.");
+        }
+    }
+}
+
+/* Change bowler manually */
+function changeBowler(){
+    const sel=document.getElementById("bowlerSelect").value;
+    if(sel) bowlerName=sel; updateBoard();
+}
+
+/* Add over summary */
+function addOverSummary(){
+    const tbody=document.getElementById("overSummaryTable").querySelector("tbody");
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${Math.floor(balls/6)}</td><td>${strikerRuns}</td><td>${nonStrikerRuns}</td><td>${currentOverRuns}</td><td>${currentOverWickets}</td>`;
+    tbody.appendChild(tr);
+    currentOverRuns=0; currentOverWickets=0;
+}
+
+/* Update ball-by-ball table */
+function updateHistory(){
+    const tbody=document.getElementById("ballHistoryTable").querySelector("tbody");
+    tbody.innerHTML="";
+    ballHistory.forEach(b=>{
+        const tr=document.createElement("tr");
+        tr.innerHTML=`<td>${b.over}.${b.ball}</td><td>${b.striker}</td><td>${b.nonStriker}</td><td>${b.bowler}</td><td>${b.value}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+/* Undo last action */
+function undo(){
+    if(ballHistory.length===0) return alert("No action to undo");
+    const last=ballHistory.pop();
+    switch(last.value){
+        case 0: case 1: case 2: case 3: case 4: case 6:
+            runs-=last.value; balls--; strikerRuns-=last.value; currentOverRuns-=last.value; break;
+        case "Wd": runs--; currentOverRuns--; break;
+        case "Nb": break;
+        case "W": wickets--; balls--; currentOverWickets--; break;
+    }
+    updateHistory(); updateBoard();
+}
+</script>
+
+</body>
+</html>
